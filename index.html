@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SolarSync: Advanced Solar Power Forecasting</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" onerror="console.warn('SolarSync: Failed to load Google Fonts')">
+    <link rel="stylesheet" href="tailwind.css" onerror="console.error('SolarSync: Failed to load tailwind.css. Ensure it is in C:\\Users\\Harish Ramavath\\OneDrive\\Desktop\\SolarForecastApp')">
+    <link rel="stylesheet" href="input.css" onerror="console.warn('SolarSync: Failed to load input.css. Ensure it is in C:\\Users\\Harish Ramavath\\OneDrive\\Desktop\\SolarForecastApp')">
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin="anonymous" onload="console.log('SolarSync: React loaded from unpkg')" onerror="console.error('SolarSync: Failed to load React from unpkg')"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin="anonymous" onload="console.log('SolarSync: ReactDOM loaded from unpkg')" onerror="console.error('SolarSync: Failed to load ReactDOM from unpkg')"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.9/babel.min.js" crossorigin="anonymous" onload="console.log('SolarSync: Babel loaded from unpkg')" onerror="console.error('SolarSync: Failed to load Babel from unpkg')"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js" crossorigin="anonymous" onload="console.log('SolarSync: Chart.js loaded from jsDelivr')" onerror="console.error('SolarSync: Failed to load Chart.js from jsDelivr')"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js" crossorigin="anonymous" onload="console.log('SolarSync: Moment.js loaded')" onerror="console.error('SolarSync: Failed to load Moment.js')"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0" crossorigin="anonymous" onload="console.log('SolarSync: Chart.js Moment Adapter loaded')" onerror="console.error('SolarSync: Failed to load Chart.js Moment Adapter')"></script>
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js" crossorigin="anonymous" onload="console.log('SolarSync: MapLibre GL loaded from unpkg')" onerror="console.error('SolarSync: Failed to load MapLibre GL from unpkg')"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" onerror="console.warn('SolarSync: Failed to load MapLibre GL CSS')" />
+    <link rel="icon" href="favicon.ico" type="image/x-icon" onerror="console.warn('SolarSync: Failed to load favicon.ico. Ensure it is in C:\\Users\\Harish Ramavath\\OneDrive\\Desktop\\SolarForecastApp')">
+    <style>
+        body { transition: background-color 0.3s, color 0.3s; }
+        .dark { background-color: #1f2937; color: #e5e7eb; }
+        .dark .bg-white { background-color: #374151; }
+        .dark .bg-gray-50 { background-color: #4b5563; }
+        .dark .text-gray-600 { color: #d1d5db; }
+        .dark .text-gray-800 { color: #f3f4f6; }
+        .dark .border-gray-200 { border-color: #4b5563; }
+        .dashboard-controls { display: block !important; visibility: visible !important; min-height: 200px; }
+        .download-button-container { display: block !important; visibility: visible !important; margin-top: 16px; }
+        .download-button { 
+            display: block !important; 
+            visibility: visible !important; 
+            background-color: #16a34a !important; 
+            color: white !important; 
+            padding: 12px 24px !important; 
+            border-radius: 8px !important; 
+            font-size: 16px !important; 
+        }
+        .download-button:disabled { 
+            background-color: #9ca3af !important; 
+            cursor: not-allowed !important; 
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans antialiased">
+    <div id="root"></div>
+    <script type="text/babel">
+        console.log('SolarSync: Starting frontend initialization...');
+
+        window.addEventListener('error', (event) => {
+            console.error('SolarSync: Unhandled error:', {
+                message: event.message,
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno,
+                error: event.error
+            });
+        });
+
+        const { useState, useEffect, useRef } = React;
+
+        class ErrorBoundary extends React.Component {
+            state = { hasError: false, error: null };
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error };
+            }
+            componentDidCatch(error, errorInfo) {
+                console.error('SolarSync: ErrorBoundary caught error:', {
+                    error: error.message,
+                    stack: error.stack,
+                    componentStack: errorInfo.componentStack
+                });
+            }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="bg-red-100 p-6 rounded-xl shadow-md text-center">
+                            <h2 className="text-xl font-semibold text-red-800">SolarSync: Something Went Wrong</h2>
+                            <p className="text-gray-700 mt-2">Error: {this.state.error?.message || 'Unknown error'}</p>
+                            <p className="text-gray-600 mt-2">Check the browser console for details.</p>
+                            <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">Reload</button>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
+        const DownloadButton = ({ forecastData, historicalData, weatherData, inverter, powerType }) => {
+            console.log('SolarSync: Rendering DownloadButton component', {
+                hasForecastData: !!forecastData,
+                hasHistoricalData: !!historicalData,
+                hasWeatherData: !!weatherData
+            });
+
+            const downloadDataAsCSV = () => {
+                console.log('SolarSync: downloadDataAsCSV called', {
+                    hasForecastData: !!forecastData,
+                    hasHistoricalData: !!historicalData,
+                    hasWeatherData: !!weatherData
+                });
+                try {
+                    let csvContent = '';
+
+                    if (forecastData && forecastData.forecast) {
+                        console.log('SolarSync: Generating forecast data CSV');
+                        csvContent += 'Forecast Data\n';
+                        csvContent += 'Date,Actual Power (kW),Predicted Power (kW),Inverter,Power Type\n';
+                        forecastData.forecast.forEach(d => {
+                            csvContent += `"${d.date_time}",${d.actual},${d.predicted},${inverter},${powerType}\n`;
+                        });
+                        csvContent += '\n';
+                    } else {
+                        console.warn('SolarSync: No forecast data available');
+                        csvContent += 'Forecast Data\nNo data available\n\n';
+                    }
+
+                    if (historicalData) {
+                        console.log('SolarSync: Generating historical data CSV');
+                        csvContent += 'Historical Data\n';
+                        csvContent += 'Date,Actual Power (kW)\n';
+                        historicalData.forEach(d => {
+                            csvContent += `"${d.date_time}",${d.actual}\n`;
+                        });
+                        csvContent += '\n';
+                    } else {
+                        console.warn('SolarSync: No historical data available');
+                        csvContent += 'Historical Data\nNo data available\n\n';
+                    }
+
+                    if (weatherData && weatherData.list) {
+                        console.log('SolarSync: Generating weather data CSV');
+                        csvContent += 'Weather Data\n';
+                        csvContent += 'Date,Weather Description,Temperature (°C)\n';
+                        weatherData.list.forEach(d => {
+                            const description = d.weather && d.weather[0] ? d.weather[0].description : 'N/A';
+                            const temp = d.main ? d.main.temp : 'N/A';
+                            csvContent += `"${d.dt_txt || 'N/A'}","${description}",${temp}\n`;
+                        });
+                    } else {
+                        console.warn('SolarSync: No weather data available');
+                        csvContent += 'Weather Data\nNo data available\n';
+                    }
+
+                    console.log('SolarSync: Creating Blob for CSV download');
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `SolarSync_Data_${new Date().toISOString().split('T')[0]}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    console.log('SolarSync: CSV download initiated successfully');
+                } catch (err) {
+                    console.error('SolarSync: Error generating CSV:', {
+                        message: err.message,
+                        stack: err.stack
+                    });
+                    alert('Failed to download data. Check the console for details.');
+                }
+            };
+
+            return (
+                <div className="download-button-container">
+                    <p className="text-gray-600 mb-2">Download Data Button Below (if not visible, check console logs):</p>
+                    <button 
+                        onClick={() => {
+                            console.log('SolarSync: Download Data button clicked');
+                            downloadDataAsCSV();
+                        }} 
+                        className="download-button px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        style={{ display: 'block', visibility: 'visible', marginTop: '16px' }}
+                        disabled={!forecastData || !historicalData || !weatherData}
+                    >
+                        Download Data
+                    </button>
+                </div>
+            );
+        };
+
+        const App = () => {
+            console.log('SolarSync: Rendering App component');
+            const [forecastData, setForecastData] = useState(null);
+            const [weatherData, setWeatherData] = useState(null);
+            const [historicalData, setHistoricalData] = useState(null);
+            const [error, setError] = useState(null);
+            const [dateRange, setDateRange] = useState('all');
+            const [powerType, setPowerType] = useState('AC');
+            const [inverter, setInverter] = useState('all');
+            const [solarBotResponse, setSolarBotResponse] = useState('');
+            const forecastChartRef = useRef(null);
+            const errorChartRef = useRef(null);
+            const mapRef = useRef(null);
+            const [mapError, setMapError] = useState(null);
+
+            useEffect(() => {
+                let isMounted = true;
+                const fetchWithRetry = async (url, retries = 3, delay = 1000) => {
+                    for (let i = 0; i < retries; i++) {
+                        try {
+                            console.log(`SolarSync: Fetching ${url}, attempt ${i + 1}`);
+                            const response = await fetch(url, { mode: 'cors' });
+                            console.log(`SolarSync: Fetch status for ${url}: ${response.status}`);
+                            if (!response.ok) {
+                                const errorText = await response.text();
+                                throw new Error(`HTTP ${response.status} - ${response.statusText}: ${errorText}`);
+                            }
+                            const data = await response.json();
+                            if (data.error) throw new Error(data.error);
+                            console.log(`SolarSync: Fetch successful for ${url}`);
+                            return data;
+                        } catch (err) {
+                            console.error(`SolarSync: Fetch error for ${url}: ${err.message}`, {
+                                error: err,
+                                attempt: i + 1,
+                                url
+                            });
+                            if (i < retries - 1) {
+                                console.warn(`SolarSync: Retrying fetch for ${url} (${i + 1}/${retries})`);
+                                await new Promise(resolve => setTimeout(resolve, delay));
+                                continue;
+                            }
+                            throw err;
+                        }
+                    }
+                };
+
+                const loadData = async () => {
+                    try {
+                        console.log('SolarSync: Starting data load...');
+                        const [forecast, weather, historical] = await Promise.all([
+                            fetchWithRetry(`http://localhost:5000/api/forecast?date_range=${dateRange}&power_type=${powerType}&inverter=${inverter}`),
+                            fetchWithRetry('http://localhost:5000/api/map'),
+                            fetchWithRetry(`http://localhost:5000/api/historical?date_range=${dateRange}`)
+                        ]);
+                        console.log('SolarSync: Data loaded successfully:', { 
+                            forecast: forecast ? 'loaded' : 'null', 
+                            weather: weather ? 'loaded' : 'null', 
+                            historical: historical ? 'loaded' : 'null' 
+                        });
+                        if (isMounted) {
+                            setForecastData(forecast);
+                            setWeatherData(weather);
+                            setHistoricalData(historical);
+                            setMapError(null);
+                        }
+                    } catch (err) {
+                        console.error('SolarSync: Load data error:', {
+                            message: err.message,
+                            stack: err.stack
+                        });
+                        if (isMounted) {
+                            setError(`Failed to load data: ${err.message}. Ensure backend is running at http://localhost:5000 and check console for fetch errors.`);
+                        }
+                    }
+                };
+
+                loadData();
+                return () => { isMounted = false; };
+            }, [dateRange, powerType, inverter]);
+
+            useEffect(() => {
+                if (!forecastData || !historicalData || !document.getElementById('forecastChart') || !window.Chart) {
+                    console.warn('SolarSync: Cannot initialize forecast chart. Missing:', {
+                        forecastData: !forecastData,
+                        historicalData: !historicalData,
+                        forecastChartElement: !document.getElementById('forecastChart'),
+                        Chart: !window.Chart
+                    });
+                    return;
+                }
+                try {
+                    console.log('SolarSync: Initializing forecast chart');
+                    const ctx = document.getElementById('forecastChart').getContext('2d');
+                    if (forecastChartRef.current) forecastChartRef.current.destroy();
+                    forecastChartRef.current = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: forecastData.forecast.map(d => new Date(d.date_time)),
+                            datasets: [
+                                {
+                                    label: `Actual ${powerType} Power`,
+                                    data: forecastData.forecast.map(d => d.actual),
+                                    borderColor: '#1E40AF',
+                                    backgroundColor: 'rgba(30, 64, 175, 0.1)',
+                                    fill: false,
+                                    tension: 0.4,
+                                    pointRadius: 4,
+                                    pointHoverRadius: 6
+                                },
+                                {
+                                    label: `Predicted ${powerType} Power`,
+                                    data: forecastData.forecast.map(d => d.predicted),
+                                    borderColor: '#F59E0B',
+                                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                                    fill: false,
+                                    tension: 0.4,
+                                    pointRadius: 4,
+                                    pointHoverRadius: 6
+                                },
+                                {
+                                    label: 'Historical Data',
+                                    data: historicalData.map(d => d.actual),
+                                    borderColor: '#10B981',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    fill: false,
+                                    borderDash: [5, 5],
+                                    tension: 0.4,
+                                    pointRadius: 4,
+                                    pointHoverRadius: 6
+                                }
+                            ],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: { type: 'time', time: { unit: 'hour' }, grid: { color: '#E5E7EB' }, ticks: { color: '#4B5563', font: { size: 12 } } },
+                                y: { title: { display: true, text: 'Power (kW)', color: '#1E40AF', font: { size: 14 } }, grid: { color: '#E5E7EB' }, ticks: { color: '#4B5563', font: { size: 12 } } }
+                            },
+                            plugins: {
+                                legend: { labels: { color: '#1E40AF', font: { size: 14 } } },
+                                tooltip: { backgroundColor: '#FFFFFF', titleColor: '#1E40AF', bodyColor: '#4B5563', borderColor: '#E5E7EB', borderWidth: 1 }
+                            }
+                        },
+                    });
+                } catch (err) {
+                    console.error('SolarSync: Error initializing forecast chart:', err);
+                }
+            }, [forecastData, historicalData, powerType]);
+
+            useEffect(() => {
+                if (!forecastData || !document.getElementById('errorChart') || !window.Chart) {
+                    console.warn('SolarSync: Cannot initialize error chart. Missing:', {
+                        forecastData: !forecastData,
+                        errorChartElement: !document.getElementById('errorChart'),
+                        Chart: !window.Chart
+                    });
+                    return;
+                }
+                try {
+                    console.log('SolarSync: Initializing error chart');
+                    const ctx = document.getElementById('errorChart').getContext('2d');
+                    if (errorChartRef.current) errorChartRef.current.destroy();
+                    const errors = forecastData.forecast.map(d => Math.abs(d.actual - d.predicted));
+                    errorChartRef.current = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: forecastData.forecast.map(d => new Date(d.date_time)),
+                            datasets: [
+                                {
+                                    label: 'Prediction Error',
+                                    data: errors,
+                                    borderColor: '#EF4444',
+                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                    fill: false,
+                                    tension: 0.4,
+                                    pointRadius: 4,
+                                    pointHoverRadius: 6
+                                }
+                            ],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: { type: 'time', time: { unit: 'hour' }, grid: { color: '#E5E7EB' }, ticks: { color: '#4B5563', font: { size: 12 } } },
+                                y: { title: { display: true, text: 'Error (kW)', color: '#1E40AF', font: { size: 14 } }, grid: { color: '#E5E7EB' }, ticks: { color: '#4B5563', font: { size: 12 } } }
+                            },
+                            plugins: {
+                                legend: { labels: { color: '#1E40AF', font: { size: 14 } } },
+                                tooltip: { backgroundColor: '#FFFFFF', titleColor: '#1E40AF', bodyColor: '#4B5563', borderColor: '#E5E7EB', borderWidth: 1 }
+                            }
+                        },
+                    });
+                } catch (err) {
+                    console.error('SolarSync: Error initializing error chart:', err);
+                }
+            }, [forecastData]);
+
+            useEffect(() => {
+                if (!weatherData || !document.getElementById('weatherMap') || !window.maplibregl) {
+                    console.warn('SolarSync: Cannot initialize weather map. Missing:', {
+                        weatherData: !weatherData,
+                        mapElement: !document.getElementById('weatherMap'),
+                        maplibregl: !window.maplibregl
+                    });
+                    return;
+                }
+                try {
+                    console.log('SolarSync: Initializing weather map');
+                    if (!weatherData.list || !weatherData.list[0] || !weatherData.list[0].weather || !weatherData.list[0].weather[0]) {
+                        throw new Error('Invalid weather data structure');
+                    }
+                    if (mapRef.current) mapRef.current.remove();
+                    mapRef.current = new maplibregl.Map({
+                        container: 'weatherMap',
+                        style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+                        center: [77.2090, 28.6139],
+                        zoom: 10
+                    });
+                    mapRef.current.on('load', () => {
+                        try {
+                            const weatherDescription = weatherData.list[0].weather[0].description || 'No weather data available';
+                            mapRef.current.addSource('weather', {
+                                type: 'geojson',
+                                data: {
+                                    type: 'Feature',
+                                    geometry: { type: 'Point', coordinates: [77.2090, 28.6139] },
+                                    properties: { weather: weatherDescription }
+                                }
+                            });
+                            mapRef.current.addLayer({
+                                id: 'weather-layer',
+                                type: 'circle',
+                                source: 'weather',
+                                paint: { 'circle-radius': 10, 'circle-color': '#FF0000' }
+                            });
+                            new maplibregl.Marker()
+                                .setLngLat([77.2090, 28.6139])
+                                .setPopup(new maplibregl.Popup().setText(`Weather: ${weatherDescription}`))
+                                .addTo(mapRef.current);
+                            setMapError(null);
+                        } catch (err) {
+                            console.error('SolarSync: Error adding weather layer:', err);
+                            setMapError(`Failed to load weather map layer: ${err.message}`);
+                        }
+                    });
+                    mapRef.current.on('error', (err) => {
+                        console.error('SolarSync: MapLibre GL error:', err);
+                        setMapError(`MapLibre GL error: ${err.error?.message || 'Unknown error'}`);
+                    });
+                } catch (err) {
+                    console.error('SolarSync: Error initializing weather map:', err);
+                    setMapError(`Failed to initialize weather map: ${err.message}`);
+                }
+            }, [weatherData]);
+
+            const analyzePowerData = (historicalData, weatherData) => {
+                console.log('SolarSync: analyzePowerData called:', { historicalData, weatherData });
+                if (!historicalData || !weatherData) {
+                    return "I couldn't analyze the data because it's not available.";
+                }
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const todayData = historicalData.filter(d => {
+                    const date = new Date(d.date_time);
+                    return date.getDate() === today.getDate() &&
+                           date.getMonth() === today.getMonth() &&
+                           date.getFullYear() === today.getFullYear();
+                });
+                if (todayData.length === 0) {
+                    return "No historical data available for today to analyze.";
+                }
+                const avgPowerToday = todayData.reduce((sum, d) => sum + d.actual, 0) / todayData.length;
+                const avgPowerOverall = historicalData.reduce((sum, d) => sum + d.actual, 0) / historicalData.length;
+                const isLowPower = avgPowerToday < avgPowerOverall * 0.9;
+                const weatherDescription = weatherData.list && weatherData.list[0] && weatherData.list[0].weather && weatherData.list[0].weather[0]
+                    ? weatherData.list[0].weather[0].description
+                    : 'unknown';
+                const reasons = [];
+                if (isLowPower) {
+                    reasons.push(`Today's average power (${avgPowerToday.toFixed(2)} kW) is lower than the historical average (${avgPowerOverall.toFixed(2)} kW).`);
+                    if (weatherDescription.toLowerCase().includes('cloud') || 
+                        weatherDescription.toLowerCase().includes('rain') || 
+                        weatherDescription.toLowerCase().includes('storm')) {
+                        reasons.push(`This could be due to unfavorable weather conditions, such as ${weatherDescription}.`);
+                    } else {
+                        reasons.push("This might be due to factors like reduced sunlight, system maintenance, or other operational issues.");
+                    }
+                } else {
+                    reasons.push(`Today's average power (${avgPowerToday.toFixed(2)} kW) is not significantly lower than the historical average (${avgPowerOverall.toFixed(2)} kW).`);
+                    reasons.push("Please check the Power Generation Forecast chart for detailed data.");
+                }
+                return reasons.join(" ");
+            };
+
+            const getAccuracyMetrics = (forecastData, weatherData) => {
+                console.log('SolarSync: getAccuracyMetrics called:', { forecastData, weatherData });
+                if (!forecastData || !forecastData.metrics) {
+                    return "Prediction accuracy metrics are not available.";
+                }
+                const { mae, rmse, mape, r2 } = forecastData.metrics;
+                return `Prediction accuracy metrics: MAE = ${mae.toFixed(2)} kW (average error), RMSE = ${rmse.toFixed(2)} kW (error spread), MAPE = ${mape.toFixed(2)}% (percentage error), R² = ${r2.toFixed(2)} (model fit, ${(r2 * 100).toFixed(0)}% explained).`;
+            };
+
+            const getControlsInfo = (dateRange, powerType, inverter) => {
+                console.log('SolarSync: getControlsInfo called:', { dateRange, powerType, inverter });
+                const response = [
+                    "The Dashboard Controls allow you to filter the data displayed in the charts and map.",
+                    `- Date Range: Currently set to "${dateRange}". Options include "all", "today", "week", or "month".`,
+                    `- Power Type: Currently set to "${powerType}". Options are "AC" or "DC".`,
+                    `- Inverter: Currently set to "${inverter}". Options are "all", "inv1", or "inv2".`,
+                    "Use the dropdown menus in the Dashboard Controls section to change these settings."
+                ];
+                return response.join(" ");
+            };
+
+            const getAppInfo = () => {
+                return "SolarSync is a cutting-edge power forecasting dashboard designed to provide real-time insights into solar power generation. It features a Power Generation Forecast chart showing actual and predicted power, a Weather Map with current conditions, Model Performance Metrics (MAE, RMSE, MAPE, R²), and an Error Trend chart. Use the Dashboard Controls to filter data by date range, power type, or inverter, and download the data as a CSV file. Ask SolarBot for help with queries about forecasts, weather, metrics, historical data, controls, styling, or app features.";
+            };
+
+            const getChartMapInfo = (forecastData, weatherData, query) => {
+                console.log('SolarSync: getChartMapInfo called:', { forecastData, weatherData, query });
+                const tokens = query.toLowerCase().split(/\s+/);
+                const isForecastChart = tokens.some(t => t.includes('forecast') || t.includes('chart'));
+                const isErrorChart = tokens.some(t => t.includes('error') || t.includes('trend'));
+                const isWeatherMap = tokens.some(t => t.includes('weather') || t.includes('map'));
+                if (isForecastChart) {
+                    return "The Power Generation Forecast chart displays actual (blue) and predicted (orange) power output in kW over time, with historical data shown as a green dashed line. It uses a smooth line style for clarity and is filterable via the Dashboard Controls.";
+                } else if (isErrorChart) {
+                    return "The Error Trend chart shows the prediction error (in kW) over time, calculated as the absolute difference between actual and predicted power. It uses a red line to highlight errors and is styled for clear visualization.";
+                } else if (isWeatherMap) {
+                    const weatherDescription = weatherData && weatherData.list && weatherData.list[0] && weatherData.list[0].weather && weatherData.list[0].weather[0]
+                        ? weatherData.list[0].weather[0].description
+                        : 'unavailable';
+                    return `The Weather Map displays current and forecasted weather conditions for the solar plant's location (lat: 28.6139, lon: 77.2090). Current condition: ${weatherDescription}. A red marker indicates the plant's position on a dark-themed map.`;
+                } else {
+                    return "The dashboard includes three main visualizations: the Power Generation Forecast chart, the Error Trend chart, and the Weather Map. Ask specifically about the 'forecast chart', 'error trend', or 'weather map' for detailed information.";
+                }
+            };
+
+            const getStylingInfo = (query) => {
+                console.log('SolarSync: getStylingInfo called:', { query });
+                const tokens = query.toLowerCase().split(/\s+/);
+                const isInputStyle = tokens.some(t => t.includes('input') || t.includes('solarbot') || t.includes('form'));
+                if (isInputStyle) {
+                    return "The SolarBot input field is styled with a modern, rounded design using Tailwind CSS and custom styles from input.css. It features a 2px border, smooth focus effects, and a blue accent color (#1E40AF). The 'Ask' button has a vibrant blue background with hover animations for interactivity.";
+                } else {
+                    return "The SolarSync dashboard uses a sleek, modern design with Tailwind CSS for responsive layouts and a custom input.css for enhanced styling. The color scheme features vibrant blues (#1E40AF) and oranges (#F59E0B) inspired by solar energy, with the Inter font for clean typography. Charts and maps are styled for clarity with subtle shadows and rounded corners.";
+                }
+            };
+
+            const processQuery = (query, historicalData, weatherData, forecastData, dateRange, powerType, inverter) => {
+                console.log('SolarSync: processQuery called:', { query, historicalData, weatherData, forecastData, dateRange, powerType, inverter });
+                const tokens = query.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+                const queryLower = query.toLowerCase();
+                const intents = [
+                    {
+                        name: 'metrics',
+                        keywords: ['metrics', 'accuracy', 'error', 'mae', 'rmse', 'mape', 'r2'],
+                        exactPhrases: ['prediction accuracy', 'what is the prediction accuracy'],
+                        exclude: [],
+                        response: () => getAccuracyMetrics(forecastData, weatherData),
+                        priority: 2
+                    },
+                    {
+                        name: 'forecast',
+                        keywords: ['forecast', 'prediction', 'predict', 'power', 'generation', 'output'],
+                        exactPhrases: [],
+                        exclude: ['accuracy', 'error', 'metrics'],
+                        response: 'Please check the Power Generation Forecast chart for predicted and actual power data.',
+                        priority: 1
+                    },
+                    {
+                        name: 'weather',
+                        keywords: ['weather', 'condition', 'climate', 'temperature', 'rain', 'sun'],
+                        exactPhrases: [],
+                        exclude: ['map'],
+                        response: 'View the Weather Map section for current and forecasted weather conditions.',
+                        priority: 1
+                    },
+                    {
+                        name: 'historical',
+                        keywords: ['historical', 'past', 'previous', 'history', 'data'],
+                        exactPhrases: [],
+                        exclude: [],
+                        response: 'The historical data is displayed as a dashed green line in the Power Generation Forecast chart.',
+                        priority: 1
+                    },
+                    {
+                        name: 'why_power',
+                        keywords: ['why', 'less', 'low', 'lower', 'power', 'today', 'decrease', 'reduced'],
+                        exactPhrases: [],
+                        exclude: [],
+                        response: () => analyzePowerData(historicalData, weatherData),
+                        priority: 1
+                    },
+                    {
+                        name: 'controls',
+                        keywords: ['control', 'controls', 'date', 'range', 'power', 'type', 'inverter', 'change', 'filter', 'dropdown'],
+                        exactPhrases: [],
+                        exclude: [],
+                        response: () => getControlsInfo(dateRange, powerType, inverter),
+                        priority: 1
+                    },
+                    {
+                        name: 'app_info',
+                        keywords: ['app', 'dashboard', 'what', 'purpose', 'feature', 'function', 'about'],
+                        exactPhrases: [],
+                        exclude: [],
+                        response: () => getAppInfo(),
+                        priority: 1
+                    },
+                    {
+                        name: 'chart_map',
+                        keywords: ['chart', 'map', 'forecast', 'error', 'trend', 'weather'],
+                        exactPhrases: [],
+                        exclude: ['accuracy', 'metrics'],
+                        response: () => getChartMapInfo(forecastData, weatherData, query),
+                        priority: 1
+                    },
+                    {
+                        name: 'styling',
+                        keywords: ['style', 'styling', 'css', 'design', 'appearance', 'input', 'look', 'theme'],
+                        exactPhrases: [],
+                        exclude: [],
+                        response: () => getStylingInfo(query),
+                        priority: 1
+                    },
+                    {
+                        name: 'download',
+                        keywords: ['download', 'export', 'csv', 'data'],
+                        exactPhrases: ['download data', 'export data'],
+                        exclude: [],
+                        response: 'You can download the dashboard data (forecast, historical, and weather) as a CSV file using the "Download Data" button in the Dashboard Controls section.',
+                        priority: 1
+                    }
+                ];
+                const intentScores = intents.map(intent => {
+                    let score = tokens.reduce((score, token) => {
+                        let tokenScore = 0;
+                        if (intent.keywords.some(k => token.includes(k))) tokenScore += 1;
+                        if (intent.exclude.some(e => token.includes(e))) tokenScore -= 1;
+                        return score + tokenScore;
+                    }, 0);
+                    if (intent.exactPhrases && intent.exactPhrases.some(phrase => queryLower.includes(phrase))) {
+                        score += 10;
+                    }
+                    score *= intent.priority;
+                    return { intent, score };
+                });
+                const bestIntent = intentScores.reduce((best, current) => {
+                    return current.score > best.score ? current : best;
+                }, { intent: null, score: 0 });
+                console.log('SolarSync: Intent scores:', intentScores.map(s => ({ name: s.intent.name, score: s.score })));
+                console.log('SolarSync: Selected intent:', bestIntent.intent ? bestIntent.intent.name : 'none');
+                if (bestIntent.score > 0) {
+                    return typeof bestIntent.intent.response === 'function'
+                        ? bestIntent.intent.response()
+                        : bestIntent.intent.response;
+                } else {
+                    return `I'm not sure how to help with "${query}". Try asking about:
+                    - Power forecasts (e.g., "show forecast")
+                    - Weather conditions (e.g., "current weather")
+                    - Prediction accuracy (e.g., "what is the prediction accuracy")
+                    - Historical data (e.g., "show historical data")
+                    - Why power is low (e.g., "why today power was less")
+                    - Dashboard controls (e.g., "how to change date range")
+                    - App features (e.g., "what is this app")
+                    - Charts or map (e.g., "what does the forecast chart show")
+                    - Styling (e.g., "how is the dashboard styled")
+                    - Data download (e.g., "how to download data")`;
+                }
+            };
+
+            const handleSolarBotAsk = (query) => {
+                if (!query.trim()) {
+                    setSolarBotResponse('Please enter a query to ask SolarBot.');
+                    return;
+                }
+                const response = processQuery(query, historicalData, weatherData, forecastData, dateRange, powerType, inverter);
+                setSolarBotResponse(response);
+            };
+
+            if (error) {
+                return (
+                    <div className="text-red-600 text-center p-6">
+                        <h2 className="text-2xl font-bold">Error Loading SolarSync Dashboard</h2>
+                        <p>{error}</p>
+                        <p className="mt-2">Check the browser console for details and ensure the backend API is running at http://localhost:5000.</p>
+                        <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Retry</button>
+                    </div>
+                );
+            }
+
+            console.log('SolarSync: Checking data loading state', {
+                forecastData: !!forecastData,
+                weatherData: !!weatherData,
+                historicalData: !!historicalData
+            });
+
+            if (!forecastData || !weatherData || !historicalData) {
+                return (
+                    <div className="text-center p-6">
+                        <h2 className="text-2xl font-bold text-gray-800">Loading SolarSync Dashboard...</h2>
+                        <p className="mt-2 text-gray-600">Fetching data from backend at http://localhost:5000. Please ensure the API is accessible.</p>
+                        <p className="mt-2 text-gray-500">Check the browser console for fetch errors (e.g., 'SolarSync: Fetch error'). Possible issues:</p>
+                        <ul className="mt-2 text-gray-500 list-disc list-inside">
+                            <li>Backend server not running (run `python app.py`)</li>
+                            <li>API endpoints inaccessible (test `curl http://localhost:5000/api/forecast`)</li>
+                            <li>Network issues (check internet or CORS settings)</li>
+                        </ul>
+                        <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Retry</button>
+                    </div>
+                );
+            }
+
+            console.log('SolarSync: Rendering Dashboard Controls section');
+
+            return (
+                <div className="max-w-7xl mx-auto space-y-12 p-6">
+                    <div className="flex justify-center items-center h-24">
+                        <h1 className="text-5xl font-bold text-blue-800 text-center drop-shadow-md">SolarSync: Advanced Solar Power Forecasting</h1>
+                    </div>
+                    <section className="dashboard-controls bg-white p-6 rounded-xl">
+                        <h2 className="text-2xl font-semibold mb-4 text-gray-800">Dashboard Controls</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <select value={dateRange} onChange={e => setDateRange(e.target.value)} className="p-3 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-blue-500">
+                                <option value="all">All Data</option>
+                                <option value="today">Today</option>
+                                <option value="week">Week</option>
+                                <option value="month">Month</option>
+                            </select>
+                            <select value={powerType} onChange={e => setPowerType(e.target.value)} className="p-3 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-blue-500">
+                                <option value="AC">AC Power</option>
+                                <option value="DC">DC Power</option>
+                            </select>
+                            <select value={inverter} onChange={e => setInverter(e.target.value)} className="p-3 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-blue-500">
+                                <option value="all">All Inverters</option>
+                                <option value="inv1">Inverter 1</option>
+                                <option value="inv2">Inverter 2</option>
+                            </select>
+                        </div>
+                        <DownloadButton 
+                            forecastData={forecastData}
+                            historicalData={historicalData}
+                            weatherData={weatherData}
+                            inverter={inverter}
+                            powerType={powerType}
+                        />
+                    </section>
+                    <section id="forecast" className="bg-white p-6 rounded-xl">
+                        <h2 className="text-2xl font-semibold mb-4 text-gray-800">Power Generation Forecast</h2>
+                        <div className="relative h-[400px]">
+                            <canvas id="forecastChart"></canvas>
+                        </div>
+                    </section>
+                    <section id="weather" className="bg-white p-6 rounded-xl">
+                        <h2 className="text-2xl font-semibold mb-4 text-gray-800">Weather Map</h2>
+                        {mapError ? (
+                            <div className="w-full h-[400px] bg-gray-100 rounded-lg flex items-center justify-center text-red-600">
+                                <p>{mapError}. Check the console for details or verify the OpenWeatherMap API key.</p>
+                            </div>
+                        ) : (
+                            <div id="weatherMap" className="w-full h-[400px]"></div>
+                        )}
+                    </section>
+                    <section id="metrics" className="bg-white p-6 rounded-xl">
+                        <h2 className="text-2xl font-semibold mb-4 text-gray-800">Model Performance Metrics</h2>
+                        <div className="flex flex-row flex-wrap gap-4">
+                            {['mae', 'rmse', 'mape', 'r2'].map(metric => (
+                                <div key={metric} className="p-4 bg-gray-50 rounded-lg shadow-sm flex-1 min-w-[120px] text-center">
+                                    <p className="text-sm text-gray-600 uppercase">{metric}</p>
+                                    <p className="text-lg font-bold text-blue-800">{forecastData.metrics[metric].toFixed(2)}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <h3 className="text-xl font-semibold mt-6 text-gray-800">Error Trend</h3>
+                        <div className="relative h-[300px] mt-4">
+                            <canvas id="errorChart"></canvas>
+                        </div>
+                    </section>
+                    <section id="solarbot" className="bg-white p-6 rounded-xl">
+                        <h2 className="text-2xl font-semibold mb-4 text-gray-800">SolarBot Assistant</h2>
+                        <div className="flex space-x-2">
+                            <input 
+                                type="text" 
+                                id="solarBotInput" 
+                                className="flex-1 p-3 border border-gray-300 rounded-lg bg-white text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500" 
+                                placeholder="Ask SolarBot about forecasts, weather, metrics, controls, styling, or app features..." 
+                            />
+                            <button 
+                                onClick={() => handleSolarBotAsk(document.getElementById('solarBotInput').value)} 
+                                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                            >
+                                Ask
+                            </button>
+                        </div>
+                        <p className="mt-4 text-gray-800 leading-relaxed">{solarBotResponse}</p>
+                    </section>
+                </div>
+            );
+        };
+
+        function initializeApp() {
+            console.log('SolarSync: Checking DOM readiness...');
+            if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                console.log('SolarSync: DOM is ready');
+                startApp();
+            } else {
+                console.log('SolarSync: Waiting for DOMContentLoaded');
+                document.addEventListener('DOMContentLoaded', startApp);
+            }
+        }
+
+        let root = null;
+        function startApp() {
+            console.log('SolarSync: Starting app...');
+            const rootElement = document.getElementById('root');
+            if (!rootElement) {
+                console.error('SolarSync: Error: <div id="root"> not found');
+                document.body.innerHTML = `
+                    <div class="text-red-600 text-center p-6">
+                        <h2 class="text-2xl font-bold">Failed to Load SolarSync Dashboard</h2>
+                        <p>Error: Root element not found in the DOM</p>
+                        <p>Ensure index.html includes <div id="root"></div></p>
+                        <button onclick="window.location.reload()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Retry</button>
+                    </div>
+                `;
+                return;
+            }
+
+            console.log('SolarSync: Checking dependencies...');
+            const dependencies = {
+                'React': window.React,
+                'ReactDOM': window.ReactDOM,
+                'Babel': window.Babel,
+                'Chart': window.Chart,
+                'maplibregl': window.maplibregl,
+                'moment': window.moment
+            };
+            const missingDependencies = Object.entries(dependencies)
+                .filter(([name, value]) => !value)
+                .map(([name]) => name);
+
+            if (missingDependencies.length > 0) {
+                console.error('SolarSync: Missing dependencies:', missingDependencies);
+                rootElement.innerHTML = `
+                    <div class="text-red-600 text-center p-6">
+                        <h2 className="text-2xl font-bold">Failed to Load SolarSync Dashboard</h2>
+                        <p>Critical JavaScript libraries (${missingDependencies.join(', ')}) failed to load.</p>
+                        <p>Check your internet connection and console logs.</p>
+                        <button onclick="window.location.reload()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Retry</button>
+                    </div>
+                `;
+                return;
+            }
+
+            console.log('SolarSync: All dependencies loaded:', Object.keys(dependencies));
+
+            try {
+                console.log('SolarSync: Attempting to render React app...');
+                if (!root) {
+                    root = ReactDOM.createRoot(rootElement);
+                }
+                root.render(<ErrorBoundary><App /></ErrorBoundary>);
+                console.log('SolarSync: React app rendered successfully');
+            } catch (err) {
+                console.error('SolarSync: Error rendering React app:', {
+                    message: err.message,
+                    stack: err.stack
+                });
+                rootElement.innerHTML = `
+                    <div class="text-red-600 text-center p-6">
+                        <h2 className="text-2xl font-bold">Failed to Load SolarSync Dashboard</h2>
+                        <p>Error: ${err.message}</p>
+                        <p>Check the browser console for details.</p>
+                        <button onclick="window.location.reload()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Retry</button>
+                    </div>
+                `;
+            }
+        }
+
+        initializeApp();
+    </script>
+</body>
+</html>
