@@ -15,22 +15,3 @@ npx
 # Editor backups
 *~
 *.bak
-Plant_1_Generation_Data.csv
-Plant_1_Weather_Sensor_Data.csv
-# Python
-venv/
-__pycache__/
-*.pyc
-.env
-app.log
-forecast.db
-
-# Node.js
-node_modules/
-dist/
-output.css
-npx
-
-# Editor backups
-*~
-*.bak
