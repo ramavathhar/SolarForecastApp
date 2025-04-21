@@ -76,7 +76,7 @@ def get_map_data():
         logging.error(f"Error fetching weather data: {str(e)}", exc_info=True)
         return jsonify({"error": f"Failed to fetch weather data: {str(e)}", "list": [{"weather": [{"description": "Weather data unavailable"}]}]}), 500
 
-  if __name__ == "__main__":
+if __name__ == "__main__":
     import os
     os.environ["WERKZEUG_RUN_MAIN"] = "true"  # Prevent reloader from kicking in
     app.run(debug=False, port=5000, host='0.0.0.0', use_reloader=False)
