@@ -77,4 +77,4 @@ def get_map_data():
         return jsonify({"error": f"Failed to fetch weather data: {str(e)}", "list": [{"weather": [{"description": "Weather data unavailable"}]}]}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000, host='0.0.0.0')
+    app.run(debug=True, port=5000, host='0.0.0.0', use_reloader=False)
