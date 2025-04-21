@@ -34,3 +34,13 @@
   "license": "ISC",
   "description": ""
 }
+{
+  "name": "solar-forecast-app",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "npx tailwindcss -i ./input.css -o ./static/css/output.css --minify"
+  },
+  "dependencies": {
+    "tailwindcss": "^3.4.10"
+  }
+}
