@@ -4,7 +4,8 @@ import logging
 import random
 from datetime import datetime, timedelta
 import requests
-
+import os
+from flask import Flask
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -75,12 +76,9 @@ def get_map_data():
     except requests.exceptions.RequestException as e:
         logging.error(f"Error fetching weather data: {str(e)}", exc_info=True)
         return jsonify({"error": f"Failed to fetch weather data: {str(e)}", "list": [{"weather": [{"description": "Weather data unavailable"}]}]}), 500
-import os
-if "WERKZEUG_SERVER_FD" in os.environ:
-    del os.environ["WERKZEUG_SERVER_FD"]
-if __name__ == "__main__":
-    import os
+      if __name__ == "__main__":
     if "WERKZEUG_SERVER_FD" in os.environ:
         del os.environ["WERKZEUG_SERVER_FD"]
-    os.environ["WERKZEUG_RUN_MAIN"] = "true"  # Prevent reloader issues
-    app.run(debug=False, port=5000, host='0.0.0.0', use_reloader=False)
+    os.environ["WERKZEUG_RUN_MAIN"] = "true"
+    # Only run Flask's server in development
+    if os.getenv("ENV") != "production":
