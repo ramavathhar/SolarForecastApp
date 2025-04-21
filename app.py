@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, send_from_directory
 from flask_cors import CORS
 import logging
 import random
@@ -9,8 +9,10 @@ import os
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})  # Allow all origins for /api/* routes
+# Initialize Flask app with explicit template and static folders
+app = Flask(__name__, template_folder='templates', static_folder='static')
+# Restrict CORS to your app's URL in production
+CORS(app, resources={r"/api/*": {"origins": ["https://solarforecastapp.onrender.com", "http://localhost:5000"]}})
 
 def generate_forecast_data():
     now = datetime.now()
@@ -66,7 +68,10 @@ def historical():
 @app.route('/api/map')
 def get_map_data():
     try:
-        api_key = os.getenv("OPENWEATHERMAP_API_KEY", "bd47081533c66550286112892cea28c4")
+        api_key = os.getenv("OPENWEATHERMAP_API_KEY")
+        if not api_key:
+            logging.error("OPENWEATHERMAP_API_KEY not set")
+            return jsonify({"error": "Weather API key not configured", "list": [{"weather": [{"description": "Weather data unavailable"}]}]}), 500
         url = f"https://api.openweathermap.org/data/2.5/forecast?lat=28.6139&lon=77.2090&appid={api_key}&units=metric"
         response = requests.get(url)
         response.raise_for_status()
@@ -79,11 +84,21 @@ def get_map_data():
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    try:
+        logging.info("Attempting to render index.html")
+        return render_template('index.html')
+    except Exception as e:
+        logging.error(f"Error rendering index.html: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Template error: {str(e)}"}), 500
+
+@app.route('/favicon.ico')
+def favicon():
+    try:
+        return send_from_directory(app.static_folder, 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+    except Exception as e:
+        logging.error(f"Error serving favicon.ico: {str(e)}", exc_info=True)
+        return jsonify({"error": "Favicon not found"}), 404
 
 if __name__ == "__main__":
-    if "WERKZEUG_SERVER_FD" in os.environ:
-        del os.environ["WERKZEUG_SERVER_FD"]
-    os.environ["WERKZEUG_RUN_MAIN"] = "true"
     port = int(os.environ.get("PORT", 5000))  # Use Render's dynamic port
-    app.run(debug=False, host='0.0.0.0', port=port, use_reloader=False)
+    app.run(debug=False, host='0.0.0.0', port=port)
