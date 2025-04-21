@@ -1,11 +1,11 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 import logging
 import random
 from datetime import datetime, timedelta
 import requests
 import os
-from flask import Flask
+
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -18,7 +18,7 @@ def generate_forecast_data():
     for i in range(24):  # 24-hour forecast
         date_time = (now + timedelta(hours=i)).strftime('%Y-%m-%dT%H:00:00')
         predicted = random.uniform(400, 600)  # Simulated predicted power in kW
-        actual = predicted * random.uniform(0.9, 1.1)  # Simulated actual power with slight variation
+        actual = predicted * random.uniform(0.9, 1.1)  # Simulated actual power
         forecast.append({"date_time": date_time, "predicted": round(predicted, 2), "actual": round(actual, 2)})
     metrics = {
         "mae": random.uniform(5, 15),    # Mean Absolute Error
@@ -66,19 +66,24 @@ def historical():
 @app.route('/api/map')
 def get_map_data():
     try:
-        api_key = "bd47081533c66550286112892cea28c4"
+        api_key = os.getenv("OPENWEATHERMAP_API_KEY", "bd47081533c66550286112892cea28c4")
         url = f"https://api.openweathermap.org/data/2.5/forecast?lat=28.6139&lon=77.2090&appid={api_key}&units=metric"
         response = requests.get(url)
-        response.raise_for_status()  # Raise an exception for bad status codes
+        response.raise_for_status()
         data = response.json()
         logging.info("Weather data fetched successfully from OpenWeatherMap")
         return jsonify(data)
     except requests.exceptions.RequestException as e:
         logging.error(f"Error fetching weather data: {str(e)}", exc_info=True)
         return jsonify({"error": f"Failed to fetch weather data: {str(e)}", "list": [{"weather": [{"description": "Weather data unavailable"}]}]}), 500
-      if __name__ == "__main__":
+
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+if __name__ == "__main__":
     if "WERKZEUG_SERVER_FD" in os.environ:
         del os.environ["WERKZEUG_SERVER_FD"]
     os.environ["WERKZEUG_RUN_MAIN"] = "true"
-    # Only run Flask's server in development
-    if os.getenv("ENV") != "production":
+    port = int(os.environ.get("PORT", 5000))  # Use Render's dynamic port
+    app.run(debug=False, host='0.0.0.0', port=port, use_reloader=False)
