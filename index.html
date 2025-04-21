@@ -5,17 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SolarSync: Advanced Solar Power Forecasting</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" onerror="console.warn('SolarSync: Failed to load Google Fonts')">
-    <link rel="stylesheet" href="tailwind.css" onerror="console.error('SolarSync: Failed to load tailwind.css. Ensure it is in C:\\Users\\Harish Ramavath\\OneDrive\\Desktop\\SolarForecastApp')">
-    <link rel="stylesheet" href="input.css" onerror="console.warn('SolarSync: Failed to load input.css. Ensure it is in C:\\Users\\Harish Ramavath\\OneDrive\\Desktop\\SolarForecastApp')">
-    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin="anonymous" onload="console.log('SolarSync: React loaded from unpkg')" onerror="console.error('SolarSync: Failed to load React from unpkg')"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin="anonymous" onload="console.log('SolarSync: ReactDOM loaded from unpkg')" onerror="console.error('SolarSync: Failed to load ReactDOM from unpkg')"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}" onerror="console.error('SolarSync: Failed to load Tailwind CSS')">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon" onerror="console.warn('SolarSync: Failed to load favicon.ico')">
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous" onload="console.log('SolarSync: React loaded from unpkg')" onerror="console.error('SolarSync: Failed to load React from unpkg')"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous" onload="console.log('SolarSync: ReactDOM loaded from unpkg')" onerror="console.error('SolarSync: Failed to load ReactDOM from unpkg')"></script>
     <script src="https://unpkg.com/@babel/standalone@7.23.9/babel.min.js" crossorigin="anonymous" onload="console.log('SolarSync: Babel loaded from unpkg')" onerror="console.error('SolarSync: Failed to load Babel from unpkg')"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js" crossorigin="anonymous" onload="console.log('SolarSync: Chart.js loaded from jsDelivr')" onerror="console.error('SolarSync: Failed to load Chart.js from jsDelivr')"></script>
     <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js" crossorigin="anonymous" onload="console.log('SolarSync: Moment.js loaded')" onerror="console.error('SolarSync: Failed to load Moment.js')"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0" crossorigin="anonymous" onload="console.log('SolarSync: Chart.js Moment Adapter loaded')" onerror="console.error('SolarSync: Failed to load Chart.js Moment Adapter')"></script>
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js" crossorigin="anonymous" onload="console.log('SolarSync: MapLibre GL loaded from unpkg')" onerror="console.error('SolarSync: Failed to load MapLibre GL from unpkg')"></script>
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" onerror="console.warn('SolarSync: Failed to load MapLibre GL CSS')" />
-    <link rel="icon" href="favicon.ico" type="image/x-icon" onerror="console.warn('SolarSync: Failed to load favicon.ico. Ensure it is in C:\\Users\\Harish Ramavath\\OneDrive\\Desktop\\SolarForecastApp')">
     <style>
         body { transition: background-color 0.3s, color 0.3s; }
         .dark { background-color: #1f2937; color: #e5e7eb; }
@@ -230,9 +229,9 @@
                     try {
                         console.log('SolarSync: Starting data load...');
                         const [forecast, weather, historical] = await Promise.all([
-                            fetchWithRetry(`http://localhost:5000/api/forecast?date_range=${dateRange}&power_type=${powerType}&inverter=${inverter}`),
-                            fetchWithRetry('http://localhost:5000/api/map'),
-                            fetchWithRetry(`http://localhost:5000/api/historical?date_range=${dateRange}`)
+                            fetchWithRetry(`/api/forecast?date_range=${dateRange}&power_type=${powerType}&inverter=${inverter}`),
+                            fetchWithRetry('/api/map'),
+                            fetchWithRetry(`/api/historical?date_range=${dateRange}`)
                         ]);
                         console.log('SolarSync: Data loaded successfully:', { 
                             forecast: forecast ? 'loaded' : 'null', 
@@ -251,7 +250,7 @@
                             stack: err.stack
                         });
                         if (isMounted) {
-                            setError(`Failed to load data: ${err.message}. Ensure backend is running at http://localhost:5000 and check console for fetch errors.`);
+                            setError(`Failed to load data: ${err.message}. Ensure backend is running and check console for fetch errors.`);
                         }
                     }
                 };
@@ -669,7 +668,7 @@
                     <div className="text-red-600 text-center p-6">
                         <h2 className="text-2xl font-bold">Error Loading SolarSync Dashboard</h2>
                         <p>{error}</p>
-                        <p className="mt-2">Check the browser console for details and ensure the backend API is running at http://localhost:5000.</p>
+                        <p className="mt-2">Check the browser console for details and ensure the backend API is running.</p>
                         <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Retry</button>
                     </div>
                 );
@@ -685,11 +684,11 @@
                 return (
                     <div className="text-center p-6">
                         <h2 className="text-2xl font-bold text-gray-800">Loading SolarSync Dashboard...</h2>
-                        <p className="mt-2 text-gray-600">Fetching data from backend at http://localhost:5000. Please ensure the API is accessible.</p>
+                        <p className="mt-2 text-gray-600">Fetching data from backend. Please ensure the API is accessible.</p>
                         <p className="mt-2 text-gray-500">Check the browser console for fetch errors (e.g., 'SolarSync: Fetch error'). Possible issues:</p>
                         <ul className="mt-2 text-gray-500 list-disc list-inside">
                             <li>Backend server not running (run `python app.py`)</li>
-                            <li>API endpoints inaccessible (test `curl http://localhost:5000/api/forecast`)</li>
+                            <li>API endpoints inaccessible (test `curl /api/forecast`)</li>
                             <li>Network issues (check internet or CORS settings)</li>
                         </ul>
                         <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Retry</button>
